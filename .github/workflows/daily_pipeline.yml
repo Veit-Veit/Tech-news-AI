@@ -1,0 +1,47 @@
+name: Daily Tech News Pipeline
+
+on:
+  schedule:
+    # Læuft jeden Tag um 08:00 Uhr UTC
+    - cron: '0 8 * * *'
+  # Erlaubt das manuelle Ausführen per Button auf GitHub
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Repository-Code auf den Server laden
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Python-Umgebung einrichten
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 3. Benötigte Bibliotheken installieren
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install feedparser pydantic google-genai python-dotenv
+
+      # 4. Das Hauptskript ausführen (nutzt das hinterlegte GitHub Secret)
+      - name: Run News Summarizer
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python main.py
+
+      # 5. Aktualisierte SQLite-Datenbank zurück ins Repository committen
+      - name: Commit and Push DB Changes
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "action@github.com"
+          git add news.db
+          git diff --staged --quiet || git commit -m "Auto-update: Neue News in SQLite gespeichert"
+          git push
